@@ -11,15 +11,18 @@ def pyshader(func, w, h):
     return bytes('P6\n%d %d\n255\n' % (w, h), 'ascii') + scr
 
 def func(x, y):
-     cx, cy = 0.5, 0.5
-     radius = 0.5
-     dist = math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-
-     if dist < radius:
-         fade = 1 - (dist / radius)
-         return (x * fade, y * fade, 0)
-     else:
-         return (0, 0, 0)
+     # cx, cy = 0.5, 0.5
+     # radius = 0.5
+     # dist = math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+     #
+     # if dist < radius:
+     #     fade = 1 - (dist / radius)
+     #     return (x * fade, y * fade, 0)
+     # else:
+     #     return (0, 0, 0)
+     r = 1 - (2 * x - 1.1) ** 2 - (2 * y - 1.1) ** 2
+     g = 1 - (2 * x - 0.9) ** 2 - (2 * y - 0.9) ** 2
+     return r, g, 0
 
 
 root = tk.Tk()
