@@ -1,27 +1,45 @@
-from decimal import Decimal, getcontext
+def compute_nu(k_values):
+    """
+    Вычисляет значение ν на основе заданного множества k_values.
+    """
 
-getcontext().prec = 10
+    def compute_i_set(values):
+        return {abs(k) + 4 * k for k in values if k <= 65}
 
+    def compute_delta_set(values):
+        return {4 * k + k % 3 for k in values if (k <= -16) ^ (k >= -95)}
 
-def main(z, y):
+    def compute_z_set(i_set, delta_set):
+        return {delta * i for i in i_set for delta in delta_set if delta >= i}
 
-    n = len(z)
-    result = Decimal(0)
+    i_set = compute_i_set(k_values)
+    print(f"I: {i_set}")
 
-    for i in range(1, n + 1):
-        index_z = n - 1 - ((i - 1) // 2)
-        index_y = min((i - 1) // 4, len(y) - 1)
+    delta_set = compute_delta_set(k_values)
+    print(f"Delta: {delta_set}")
 
-        term = (Decimal(83) * Decimal(z[index_z]) ** 3
-                + Decimal(54) + Decimal(y[index_y])) ** 3
-        result += term
+    z_set = compute_z_set(i_set, delta_set)
+    print(f"Z: {z_set}")
 
-    return float(result)
+    sum_i = sum(abs(i) for i in i_set)
+    pairs = [(i, z, i + z) for i in i_set for z in z_set]
+
+    for i, z, sum_val in pairs[:10]:  # Выводим только первые 10 пар
+        print(f"Пара: ({i}, {z}) -> {sum_val}")
+
+    sum_z = sum(sum_val for _, _, sum_val in pairs) if z_set else 0
+    return sum_i - sum_z
 
 
 if __name__ == "__main__":
-    z_values = [0.98, -0.26, 0.4, -0.33, 0.87]
-    y_values = [0.43, 0.9, -0.05, -0.58, -0.82]
+    try:
+        def read_input():
+            return set(
+                map(int, input("Введите множество чисел через пробел: ").split())
+            )
 
-    result = main(z_values, y_values)
-    print(f"Результат: {result:.2e}")
+
+        k_values = read_input()
+        print("Результат вычислений:", compute_nu(k_values))
+    except ValueError:
+        print("Ошибка: введите только целые числа через пробел.")
