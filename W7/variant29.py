@@ -1,45 +1,79 @@
-def main(data):
-    tree = {
-        1967: {
-            'JFLEX': {
-                'EQ': 4,
-                'FORTH': 5,
-                'REBOL': 3
-            },
-            'ASP': {
-                'FORTH': 0,
-                'REBOL': {
-                    'HLSL': 7,
-                    'STAN': 8,
-                    'EQ': 9
-                }
-            }
-        },
-        1977: {
-            'ASP': 6,
-            'JFLEX': {
-                'HLSL': 7,
-                'STAN': 8,
-                'EQ': 9
-            }
-        }
-    }
+import sys
 
-    if data[4] == 'IOKE':
+
+def main(x):
+    return first_node(x)
+
+
+def first_node(x):
+    if x[4] == 'TCL':
+        return second_node(x)
+    elif x[4] == 'IOKE':
         return 10
+    return -1
 
-    current_node = tree.get(data[0], {})
-    for i in [1, 2, 3]:
-        if isinstance(current_node, int):
-            return current_node
-        current_node = current_node.get(data[i], {})
 
-    return current_node if isinstance(current_node, int) else 0
+def second_node(x):
+    if x[0] == 1967:
+        return third_node_upper(x)
+    elif x[0] == 1977:
+        return third_node_lower(x)
+    return -1
 
-# Тестовые случаи
-print(main([1967, 'JFLEX', 'EQ', 'EQ', 'TCL']))        # 4
-print(main([1977, 'ASP', 'REBOL', 'HLSL', 'TCL']))     # 6
-print(main([1967, 'JFLEX', 'FORTH', 'HLSL', 'IOKE']))  # 10
-print(main([1967, 'JFLEX', 'REBOL', 'HLSL', 'TCL']))   # 3
-print(main([1967, 'ASP', 'FORTH', 'HLSL', 'TCL']))     # 0
-print(main([1967, 'ASP', 'EQ', 'EQ', 'TCL']))          # 0
+
+def third_node_upper(x):
+    if x[1] == 'ASP':
+        return forth_node_upper(x)
+    elif x[1] == 'JFLEX':
+        return forth_node_midle(x)
+    return -1
+
+
+def third_node_lower(x):
+    if x[1] == 'ASP':
+        return 6
+    elif x[1] == 'JFLEX':
+        return forth_node_lower(x)
+    return -1
+
+
+def forth_node_upper(x):
+    if x[3] == 'HLSL':
+        return 0
+    elif x[3] == 'STAN':
+        return 1
+    elif x[3] == 'EQ':
+        return 2
+    return -1
+
+
+def forth_node_midle(x):
+    if x[2] == 'REBOL':
+        return 3
+    elif x[2] == 'EQ':
+        return 4
+    elif x[2] == 'FORTH':
+        return 5
+    return -1
+
+
+def forth_node_lower(x):
+    if x[3] == 'HLSL':
+        return 7
+    elif x[3] == 'STAN':
+        return 8
+    elif x[3] == 'EQ':
+        return 9
+    return -1
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    x_input = [
+        int(args[0]) if args[0].isdigit() else args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4]
+    ]
+    print(main(x_input))
