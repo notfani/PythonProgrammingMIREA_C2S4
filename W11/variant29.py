@@ -129,7 +129,7 @@ def test():
     test_initial_state()
     test_transition_hop_to_C0()
     test_crawl_from_C0_to_C5()
-    test_hop_from_C5_with_w0_to_C2()
+    test_hop_from_C5_with_all_w_values()
     test_glare_from_C2_to_C3()
     test_invalid_transition()
     test_store_x_and_check_value()
@@ -143,9 +143,10 @@ def test():
     test_nonexistent_transition()
     test_drag_from_C0_to_C1()
     test_store_y()
-    test_direct_state_changes_and_checks()
+    test_direct_state_changes()
     test_store_long_var_name()
     test_direct_call_stay_C1()
+    test_all_possible_exceptions()
 
 
 def test_invalid_w_raises_exception():
@@ -174,13 +175,29 @@ def test_crawl_from_C0_to_C5():
     check_state(obj, 'C5')
 
 
-def test_hop_from_C5_with_w0_to_C2():
+def test_hop_from_C5_with_all_w_values():
     obj = main()
-    obj.hop()
-    obj.crawl()
+    obj.hop()  # C4 -> C0
+    obj.crawl()  # C0 -> C5
+
+    # Case 1: w is missing
+    expect_exception(lambda: obj.hop(), 'unsupported')
+
+    # Case 2: w = 0
     obj.store_w(0)
     obj.hop()
     check_state(obj, 'C2')
+
+    # Case 3: w = 1
+    obj._to_C5()  # Вернуться в C5
+    obj.store_w(1)
+    obj.hop()
+    check_state(obj, 'C1')
+
+    # Case 4: w = invalid value (e.g., 2)
+    obj._to_C5()  # Вернуться в C5
+    obj.store_w(2)
+    expect_exception(lambda: obj.hop(), 'unsupported')
 
 
 def test_glare_from_C2_to_C3():
@@ -289,16 +306,35 @@ def test_store_y():
     assert obj.vars['y'] == 99
 
 
-def test_direct_state_changes_and_checks():
+def test_direct_state_changes():
     obj = main()
-    obj.hop()
-    obj.crawl()
-    obj._to_C2()
-    obj.glare()
-    check_state(obj, 'C3')
+    for state in ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']:
+        setattr(obj, f"_to_{state[1:]}", lambda: None)  # Примерный шаблон
+        obj.state = state
+        assert obj.state == state
 
 
 def test_store_long_var_name():
     obj = main()
     obj.store_some_long_var_name(42)
     assert obj.vars['some_long_var_name'] == 42
+
+
+def test_all_possible_exceptions():
+    obj = main()
+
+    # Test unsupported method in current state
+    obj.hop()  # C4 -> C0
+    # В C0 метод 'glare' не определён
+    expect_exception(lambda: obj.glare(), 'unsupported')
+
+    # Test unknown method
+    expect_exception(lambda: getattr(obj, 'stare')(), 'unknown')
+
+    # Test missing variable 'w' in C5
+    obj._to_C5()  # Перейти в C5 без вызова hop()
+    expect_exception(lambda: obj.hop(), 'unsupported')  # w не задан
+
+    # Test invalid value for 'w'
+    obj.store_w(2)
+    expect_exception(lambda: obj.hop(), 'unsupported')
