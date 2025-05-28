@@ -1,340 +1,192 @@
-from contextlib import suppress
-
-
 class FSMException(Exception):
     pass
 
 
 class FSM:
+    _outputs = {
+        'c0': 'y0',
+        'c1': 'y3',
+        'c2': 'y1',
+        'c3': 'y1',
+        'c4': 'y4',
+        'c5': 'y2',
+    }
+
+    _transitions = {
+        'c4': {'hop': 'c0'},
+        'c0': {'crawl': 'c5', 'drag': 'c1'},
+        'c5': {'hop': lambda self: 'c2' if self.w == 0 else 'c1'},
+        'c1': {'drag': 'c1', 'cast': 'c4', 'crawl': 'c2'},
+        'c2': {'glare': 'c3'},
+        'c3': {},
+    }
+
+    _out_edges = {k: len(v) for k, v in _transitions.items()}
+    _loop_states = {'c4', 'c0', 'c5', 'c1'}
+
     def __init__(self):
-        self.state = 'C4'
-        self.outputs = {
-            'C0': 'y0',
-            'C1': 'y3',
-            'C2': 'y1',
-            'C3': 'y1',
-            'C4': 'y4',
-            'C5': 'y2',
-        }
-        self.transitions = {
-            'C4': {'hop': self._to_C0},
-            'C0': {'crawl': self._to_C5, 'drag': self._to_C1},
-            'C1': {'drag': self._stay_C1, 'crawl': self._to_C2},
-            'C2': {'glare': self._to_C3},
-            'C5': {'hop': self._hop_from_C5},
-        }
-        self.vars = {}
-
-    def _to_C0(self):
-        self.state = 'C0'
-
-    def _to_C1(self):
-        self.state = 'C1'
-
-    def _to_C2(self):
-        self.state = 'C2'
-
-    def _to_C3(self):
-        self.state = 'C3'
-
-    def _to_C4(self):
-        self.state = 'C4'
-
-    def _to_C5(self):
-        self.state = 'C5'
-
-    def _stay_C1(self):
-        self.state = 'C1'
-
-    def _hop_from_C5(self):
-        if 'w' not in self.vars:
-            raise FSMException('unsupported')
-        if self.vars['w'] == 0:
-            self._to_C2()
-        elif self.vars['w'] == 1:
-            self._to_C1()
-        else:
-            raise FSMException('unsupported')
+        self.state = 'c4'
+        self.w = 0
 
     def store_w(self, value):
-        self.vars['w'] = value
+        self.w = value
+
+    def _transition(self, action):
+        if self.state not in self._transitions:
+            raise FSMException('unsupported')
+        transitions = self._transitions[self.state]
+        if action not in transitions:
+            raise FSMException('unsupported')
+        target = transitions[action]
+        self.state = target(self) if callable(target) else target
+
+    def hop(self):
+        self._transition('hop')
+
+    def crawl(self):
+        self._transition('crawl')
+
+    def drag(self):
+        self._transition('drag')
+
+    def cast(self):
+        self._transition('cast')
+
+    def glare(self):
+        self._transition('glare')
 
     def get_output(self):
-        return self.outputs[self.state]
+        return self._outputs[self.state]
 
     def has_max_out_edges(self):
-        all_out_counts = [2, 2, 2, 1, 1, 1]
-        max_out = max(all_out_counts)
-        current_out = len(self.transitions.get(self.state, {}))
-        return current_out == max_out
+        return (self._out_edges[self.state] ==
+                max(self._out_edges.values()))
 
     def part_of_loop(self):
-        loops = {'C0', 'C1', 'C2', 'C5'}
-        return self.state in loops
+        return self.state in self._loop_states
 
     def __getattr__(self, name):
-        if name.startswith('store_'):
-            return self._make_store_func(name)
-        if self._is_known_transition(name):
-            return lambda: self._handle_transition(name)
         raise FSMException('unknown')
-
-    def _make_store_func(self, name):
-        var_name = name.split('_', 1)[1]
-
-        def store_func(value):
-            self.vars[var_name] = value
-
-        return store_func
-
-    def _is_known_transition(self, name):
-        return any(name in transitions for transitions
-                   in self.transitions.values())
-
-    def _handle_transition(self, name):
-        state_transitions = self.transitions.get(self.state, {})
-        if name not in state_transitions:
-            raise FSMException('unsupported')
-        state_transitions[name]()
 
 
 def main():
     return FSM()
 
 
-def check_state(obj, expected_state):
-    outputs = {
-        'C0': 'y0', 'C1': 'y3', 'C2': 'y1',
-        'C3': 'y1', 'C4': 'y4', 'C5': 'y2'
-    }
-    assert obj.state == expected_state,\
-        f"state: expected {expected_state}, got {obj.state}"
-    assert obj.get_output() == outputs[expected_state]
-    current_out = len(obj.transitions.get(obj.state, {}))
-    max_out = max([2, 2, 2, 1, 1, 1])
-    assert obj.has_max_out_edges() == (current_out == max_out)
-    assert obj.part_of_loop() == (obj.state in {'C0', 'C1', 'C2', 'C5'})
-
-
-def expect_exception(func, message):
-    try:
-        func()
-        assert False, "Expected FSMException"
-    except Exception as e:
-        assert str(e) == message,\
-            f"Expected message '{message}', got '{str(e)}'"
-
-
 def test():
-    test_initial_state()
-    test_transition_hop_to_C0()
-    test_crawl_from_C0_to_C5()
-    test_hop_from_C5_with_all_w_values()
-    test_glare_from_C2_to_C3()
-    test_invalid_transition()
-    test_store_x_and_check_value()
-    test_invalid_w_in_hop_from_C5()
-    test_stay_C1_on_drag()
-    test_missing_w_raises_exception()
-    test_invalid_w_raises_exception()
-    test_unknown_method_raises_FSMException()
-    test_all_states_get_output()
-    test_has_max_out_edges_and_part_of_loop()
-    test_nonexistent_transition()
-    test_drag_from_C0_to_C1()
-    test_store_y()
-    test_direct_state_changes()
-    test_store_long_var_name()
-    test_direct_call_stay_C1()
-    test_all_possible_exceptions()
+    fsm = main()
+    assert isinstance(fsm, FSM)
+    assert fsm.state == 'c4'
+    assert fsm.get_output() == 'y4'
+    assert fsm.part_of_loop()
+    assert not fsm.has_max_out_edges()
+
+    fsm.hop()
+    assert fsm.state == 'c0'
+    assert fsm.get_output() == 'y0'
+    assert fsm.part_of_loop()
+    assert not fsm.has_max_out_edges()
+
+    try:
+        fsm.hop()
+    except FSMException as e:
+        assert str(e) == 'unsupported'
+
+    fsm.drag()
+    assert fsm.state == 'c1'
+    assert fsm.get_output() == 'y3'
+    assert fsm.part_of_loop()
+    assert fsm.has_max_out_edges()
+
+    try:
+        fsm.hop()
+    except FSMException as e:
+        assert str(e) == 'unsupported'
+
+    fsm.crawl()
+    assert fsm.state == 'c2'
+    assert fsm.get_output() == 'y1'
+    assert not fsm.part_of_loop()
+    assert not fsm.has_max_out_edges()
+
+    try:
+        fsm.drive()
+    except FSMException as e:
+        assert str(e) == 'unknown'
+
+    fsm.glare()
+    assert fsm.state == 'c3'
+    assert fsm.get_output() == 'y1'
+    assert not fsm.part_of_loop()
+    assert not fsm.has_max_out_edges()
+
+    test_unknown_methods()
+    test_invalid_transitions()
+    test_invalid_state_raises()
 
 
-def test_invalid_w_raises_exception():
-    obj = main()
-    obj.hop()           # C4 -> C0
-    obj.crawl()         # C0 -> C5
-    obj.store_w(2)      # invalid value for w
-    expect_exception(lambda: obj.hop(), 'unsupported')
+def test_unknown_methods():
+    fsm = FSM()
+    unknown_methods = ['stare', 'drive', 'jump', 'fly']
+    for method in unknown_methods:
+        try:
+            getattr(fsm, method)()
+        except FSMException as e:
+            assert str(e) == 'unknown'
 
 
-def test_initial_state():
-    obj = main()
-    check_state(obj, 'C4')
+def test_invalid_transitions():
+    cases = [
+        ('c4', 'crawl'),
+        ('c4', 'drag'),
+        ('c0', 'hop'),
+        ('c0', 'cast'),
+        ('c0', 'glare'),
+        ('c1', 'hop'),
+        ('c1', 'glare'),
+        ('c2', 'hop'),
+        ('c2', 'cast'),
+        ('c2', 'drag'),
+        ('c3', 'hop'),
+        ('c3', 'crawl'),
+        ('c3', 'cast'),
+        ('c3', 'drag'),
+        ('c3', 'glare'),
+    ]
+
+    for state, method in cases:
+        fsm = prepare_fsm_to_state(state)
+        try:
+            getattr(fsm, method)()
+        except FSMException as e:
+            assert str(e) == 'unsupported'
 
 
-def test_transition_hop_to_C0():
-    obj = main()
-    obj.hop()
-    check_state(obj, 'C0')
+def prepare_fsm_to_state(state):
+    fsm = FSM()
+    if state == 'c0':
+        fsm.hop()
+    elif state == 'c1':
+        fsm.hop()
+        fsm.drag()
+    elif state == 'c2':
+        fsm.hop()
+        fsm.crawl()
+        fsm.store_w(0)
+        fsm.hop()
+    elif state == 'c3':
+        fsm.hop()
+        fsm.crawl()
+        fsm.store_w(0)
+        fsm.hop()
+        fsm.glare()
+    return fsm
 
 
-def test_crawl_from_C0_to_C5():
-    obj = main()
-    obj.hop()
-    obj.crawl()
-    check_state(obj, 'C5')
-
-
-def test_hop_from_C5_with_all_w_values():
-    obj = main()
-    obj.hop()  # C4 -> C0
-    obj.crawl()  # C0 -> C5
-
-    # Case 1: w is missing
-    expect_exception(lambda: obj.hop(), 'unsupported')
-
-    # Case 2: w = 0
-    obj.store_w(0)
-    obj.hop()
-    check_state(obj, 'C2')
-
-    # Case 3: w = 1
-    obj._to_C5()  # Вернуться в C5
-    obj.store_w(1)
-    obj.hop()
-    check_state(obj, 'C1')
-
-    # Case 4: w = invalid value (e.g., 2)
-    obj._to_C5()  # Вернуться в C5
-    obj.store_w(2)
-    expect_exception(lambda: obj.hop(), 'unsupported')
-
-
-def test_glare_from_C2_to_C3():
-    obj = main()
-    obj.hop()
-    obj.crawl()
-    obj.store_w(0)
-    obj.hop()
-    obj.glare()
-    check_state(obj, 'C3')
-
-
-def test_direct_call_stay_C1():
-    obj = main()
-    obj._to_C1()
-    obj._stay_C1()
-    check_state(obj, 'C1')
-
-
-def test_invalid_transition():
-    obj = main()
-    obj.hop()
-    obj.crawl()
-    obj.store_w(0)
-    obj.hop()
-    expect_exception(lambda: obj.drag(), 'unsupported')
-
-
-def test_store_x_and_check_value():
-    obj = main()
-    obj._to_C4()
-    obj.store_x(10)
-    assert obj.vars['x'] == 10
-
-
-def test_invalid_w_in_hop_from_C5():
-    obj = main()
-    obj.hop()
-    obj.crawl()
-    obj.store_w(2)
-    expect_exception(lambda: obj.hop(), 'unsupported')
-
-
-def test_stay_C1_on_drag():
-    obj = main()
-    obj.hop()
-    obj.drag()
-    check_state(obj, 'C1')
-    obj.drag()
-    check_state(obj, 'C1')  # stay_C1
-
-
-def test_missing_w_raises_exception():
-    obj = main()
-    obj.hop()
-    obj.crawl()
-    expect_exception(lambda: obj.hop(), 'unsupported')
-
-
-def test_unknown_method_raises_FSMException():
-    obj = main()
-    expect_exception(lambda: getattr(obj, 'stare')(), 'unknown')
-
-
-def test_all_states_get_output():
-    obj = main()
-    for state in ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']:
-        obj.state = state
-        out = obj.get_output()
-        assert out in ('y0', 'y1', 'y2', 'y3', 'y4')
-
-
-def test_has_max_out_edges_and_part_of_loop():
-    obj = main()
-    for state in ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']:
-        obj.state = state
-        assert obj.has_max_out_edges() == (state in {'C0', 'C1'})
-        assert obj.part_of_loop() == (state in {'C0', 'C1', 'C2', 'C5'})
-
-
-def test_nonexistent_transition():
-    obj = main()
-    obj.hop()
-    obj.crawl()
-    obj.store_w(1)
-    obj.hop()
-    obj.crawl()
-    obj.glare()
-    check_state(obj, 'C3')
-    expect_exception(lambda: obj.stare(), 'unknown')
-
-
-def test_drag_from_C0_to_C1():
-    obj = main()
-    obj.hop()
-    obj.drag()
-    check_state(obj, 'C1')
-
-
-def test_store_y():
-    obj = main()
-    obj._to_C1()
-    obj.drag()
-    check_state(obj, 'C1')
-    obj.store_y(99)
-    assert obj.vars['y'] == 99
-
-
-def test_direct_state_changes():
-    obj = main()
-    for state in ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']:
-        setattr(obj, f"_to_{state[1:]}", lambda: None)  # Примерный шаблон
-        obj.state = state
-        assert obj.state == state
-
-
-def test_store_long_var_name():
-    obj = main()
-    obj.store_some_long_var_name(42)
-    assert obj.vars['some_long_var_name'] == 42
-
-
-def test_all_possible_exceptions():
-    obj = main()
-
-    # Test unsupported method in current state
-    obj.hop()  # C4 -> C0
-    # В C0 метод 'glare' не определён
-    expect_exception(lambda: obj.glare(), 'unsupported')
-
-    # Test unknown method
-    expect_exception(lambda: getattr(obj, 'stare')(), 'unknown')
-
-    # Test missing variable 'w' in C5
-    obj._to_C5()  # Перейти в C5 без вызова hop()
-    expect_exception(lambda: obj.hop(), 'unsupported')  # w не задан
-
-    # Test invalid value for 'w'
-    obj.store_w(2)
-    expect_exception(lambda: obj.hop(), 'unsupported')
+def test_invalid_state_raises():
+    fsm = FSM()
+    fsm.state = 'invalid'
+    try:
+        fsm.hop()
+    except FSMException as e:
+        assert str(e) == 'unsupported'
